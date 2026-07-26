@@ -1,0 +1,26 @@
+aisec/
+  package.json
+  .env.example
+  README.md
+  src/
+    index.js
+    config.js
+    db/
+      client.js
+      schema.sql
+      seed.js
+    routes/
+      health.js
+      privacy.js
+      meta.js
+      jobs.js
+    services/
+      logger.js
+      instagram.js
+      gemini.js
+      timerProcessor.js
+    repositories/
+      clientsRepo.js
+      conversationsRepo.js
+      messagesRepo.js
+      settingsRepo.js
