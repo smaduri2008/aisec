@@ -1,14 +1,14 @@
 import { Router } from "express";
 import { config } from "../config.js";
 import { logger } from "../services/logger.js";
-import { upsertClient } from "../repositories/clientsRepo.js";
+import { upsertClient } from "../repositories/clientRepo.js";
 import {
   createConversation,
   getActiveConversation,
   markOwnerHandled,
   setAwaitingOwner
 } from "../repositories/conversationsRepo.js";
-import { insertMessage } from "../repositories/messagesRepo.js";
+import { insertMessage } from "../repositories/messageRepo.js";
 import { sendInstagramMessage } from "../services/instagram.js";
 
 const router = Router();

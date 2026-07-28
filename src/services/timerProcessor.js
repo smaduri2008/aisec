@@ -7,8 +7,8 @@ import {
   lockDueConversation,
   markAiHandled
 } from "../repositories/conversationsRepo.js";
-import { recentMessages, insertMessage } from "../repositories/messagesRepo.js";
-import { getClientById } from "../repositories/clientsRepo.js";
+import { recentMessages, insertMessage } from "../repositories/messageRepo.js";
+import { getClientById } from "../repositories/clientRepo.js";
 
 const FALLBACK_REPLY = "Thanks for reaching out — we’ll get back to you shortly.";
 
