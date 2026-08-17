@@ -41,6 +41,17 @@ npm run dev
 - `POST /messages/send-owner` (manual owner send, cancels timer)
 - `POST /jobs/check-timers` (cron worker trigger)
 
+## Webhook local-dev validation (Instagram)
+1. Start backend: `npm run dev`
+2. Expose local port with ngrok and set callback URL to `https://<ngrok-host>/webhooks/meta`
+3. Verify token in Meta dashboard matches `META_WEBHOOK_VERIFY_TOKEN`
+4. Click Meta webhook **Test** for `messages`, then send an IG DM from a tester account
+5. Confirm backend logs include:
+   - `[meta-webhook] request_hit`
+   - `[meta-webhook] payload_summary`
+   - `[meta-webhook] processing_complete`
+6. Confirm message rows are created in `messages` and conversation is set to `awaiting_owner`
+
 ## Cron setup (Render)
 Create a cron that POSTs:
 `https://<your-backend-domain>/jobs/check-timers`

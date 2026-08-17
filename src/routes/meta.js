@@ -13,6 +13,117 @@ import { sendInstagramMessage } from "../services/instagram.js";
 
 const router = Router();
 
+function firstString(...values) {
+  for (const value of values) {
+    if (typeof value === "string" && value.trim()) return value;
+  }
+  return null;
+}
+
+function normalizeMessagingEvent(event) {
+  const senderId = firstString(event?.sender?.id);
+  const text = firstString(event?.message?.text);
+  const mid = firstString(event?.message?.mid);
+
+  return {
+    senderId,
+    text,
+    mid,
+    username: null,
+    source: "entry.messaging"
+  };
+}
+
+function normalizeChangeEvent(change) {
+  if (change?.field !== "messages") {
+    return null;
+  }
+
+  const value = change?.value || {};
+  const firstMessage = Array.isArray(value?.messages) ? value.messages[0] : null;
+
+  const senderId = firstString(
+    value?.from?.id,
+    value?.sender?.id,
+    firstMessage?.from,
+    firstMessage?.sender?.id
+  );
+
+  const text = firstString(
+    value?.text,
+    value?.message?.text,
+    firstMessage?.text?.body,
+    firstMessage?.text
+  );
+
+  const mid = firstString(
+    value?.mid,
+    value?.message?.mid,
+    firstMessage?.id,
+    firstMessage?.mid
+  );
+
+  return {
+    senderId,
+    text,
+    mid,
+    username: firstString(value?.from?.username, value?.sender?.username),
+    source: "entry.changes"
+  };
+}
+
+function extractMetaEvents(body) {
+  const normalized = [];
+  const skipped = [];
+  const entries = Array.isArray(body?.entry) ? body.entry : [];
+  let messagingCount = 0;
+  let changesCount = 0;
+
+  for (const entry of entries) {
+    const messagingEvents = Array.isArray(entry?.messaging) ? entry.messaging : [];
+    messagingCount += messagingEvents.length;
+    for (const event of messagingEvents) {
+      const candidate = normalizeMessagingEvent(event);
+      if (candidate?.senderId && candidate?.text) {
+        normalized.push(candidate);
+      } else {
+        skipped.push({ source: "entry.messaging", reason: "non_message_or_missing_sender" });
+      }
+    }
+
+    const changes = Array.isArray(entry?.changes) ? entry.changes : [];
+    changesCount += changes.length;
+    for (const change of changes) {
+      const candidate = normalizeChangeEvent(change);
+      if (!candidate) {
+        skipped.push({ source: "entry.changes", reason: "unsupported_field" });
+        continue;
+      }
+
+      if (candidate.senderId && candidate.text) {
+        normalized.push(candidate);
+      } else {
+        skipped.push({ source: "entry.changes", reason: "non_message_or_missing_sender" });
+      }
+    }
+  }
+
+  return {
+    events: normalized,
+    skipped,
+    summary: {
+      object: body?.object || null,
+      entryCount: entries.length,
+      messagingCount,
+      changesCount
+    }
+  };
+}
+
+function logWebhook(event, details) {
+  logger.info(`[meta-webhook] ${event}`, JSON.stringify(details));
+}
+
 /**
  * Meta webhook verification
  */
@@ -40,29 +151,36 @@ router.post("/webhooks/meta/message-deletions", (req, res) => {
  * Handles inbound messaging events and starts/refreshes reply timer.
  */
 router.post("/webhooks/meta", async (req, res) => {
-  try {
-    const body = req.body;
-    logger.info("META WEBHOOK RAW:", JSON.stringify(body));
+  const body = req.body;
+  logWebhook("request_hit", {
+    method: req.method,
+    path: req.path,
+    hasBody: !!body,
+    bodyType: typeof body
+  });
 
+  try {
     if (!body?.entry || !Array.isArray(body.entry)) {
+      logWebhook("payload_ignored", { reason: "No entry array", object: body?.object || null });
       return res.status(200).json({ ignored: true, reason: "No entry array" });
     }
 
-    for (const entry of body.entry) {
-      // A) Messenger-style payloads
-      const messagingEvents = Array.isArray(entry.messaging) ? entry.messaging : [];
-      for (const event of messagingEvents) {
-        const senderId = event?.sender?.id;
-        const text = event?.message?.text;
-        const mid = event?.message?.mid;
+    const { events, skipped, summary } = extractMetaEvents(body);
+    logWebhook("payload_summary", {
+      ...summary,
+      normalizedEventCount: events.length,
+      skippedCount: skipped.length
+    });
 
-        // Skip non-message or echo/system events
-        if (!senderId || !text) continue;
+    let processed = 0;
+    let errors = 0;
 
+    for (const event of events) {
+      try {
         const client = await upsertClient({
           platform: "instagram",
-          platformUserId: senderId,
-          name: null
+          platformUserId: event.senderId,
+          name: event.username
         });
 
         let conversation = await getActiveConversation(client.id, "instagram");
@@ -73,51 +191,42 @@ router.post("/webhooks/meta", async (req, res) => {
         await insertMessage({
           conversationId: conversation.id,
           sender: "client",
-          content: text,
-          platformMessageId: mid || null
+          content: event.text,
+          platformMessageId: event.mid || null
         });
 
         await setAwaitingOwner(conversation.id, config.replyDelayMinutes);
-      }
-
-      // B) Instagram "changes" payloads
-      const changes = Array.isArray(entry.changes) ? entry.changes : [];
-      for (const change of changes) {
-        if (change?.field !== "messages") continue;
-
-        const value = change?.value || {};
-        const senderId = value?.from?.id || value?.sender?.id;
-        const text = value?.text || value?.message?.text;
-        const mid = value?.mid || value?.message?.mid;
-
-        if (!senderId || !text) continue;
-
-        const client = await upsertClient({
-          platform: "instagram",
-          platformUserId: senderId,
-          name: value?.from?.username || null
-        });
-
-        let conversation = await getActiveConversation(client.id, "instagram");
-        if (!conversation) {
-          conversation = await createConversation(client.id, "instagram");
-        }
-
-        await insertMessage({
-          conversationId: conversation.id,
-          sender: "client",
-          content: text,
-          platformMessageId: mid || null
-        });
-
-        await setAwaitingOwner(conversation.id, config.replyDelayMinutes);
+        processed += 1;
+      } catch (eventError) {
+        errors += 1;
+        logger.error(
+          "[meta-webhook] event_processing_error",
+          JSON.stringify({
+            source: event.source,
+            senderId: event.senderId || null,
+            mid: event.mid || null,
+            message: eventError.message
+          })
+        );
       }
     }
 
-    return res.status(200).json({ ok: true });
+    logWebhook("processing_complete", {
+      ...summary,
+      processedCount: processed,
+      skippedCount: skipped.length,
+      errorCount: errors
+    });
+
+    return res.status(200).json({
+      ok: true,
+      processedCount: processed,
+      skippedCount: skipped.length,
+      errorCount: errors
+    });
   } catch (err) {
     logger.error("Meta webhook processing error:", err.message);
-    return res.status(500).json({ error: "Webhook processing failed" });
+    return res.status(200).json({ ok: false, error: "Webhook processing failed" });
   }
 });
 
