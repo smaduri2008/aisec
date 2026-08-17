@@ -42,14 +42,16 @@ router.post("/webhooks/meta/message-deletions", (req, res) => {
 router.post("/webhooks/meta", async (req, res) => {
   try {
     const body = req.body;
+    logger.info("META WEBHOOK RAW:", JSON.stringify(body));
 
     if (!body?.entry || !Array.isArray(body.entry)) {
       return res.status(200).json({ ignored: true, reason: "No entry array" });
     }
 
     for (const entry of body.entry) {
-      const events = entry.messaging || [];
-      for (const event of events) {
+      // A) Messenger-style payloads
+      const messagingEvents = Array.isArray(entry.messaging) ? entry.messaging : [];
+      for (const event of messagingEvents) {
         const senderId = event?.sender?.id;
         const text = event?.message?.text;
         const mid = event?.message?.mid;
@@ -61,6 +63,39 @@ router.post("/webhooks/meta", async (req, res) => {
           platform: "instagram",
           platformUserId: senderId,
           name: null
+        });
+
+        let conversation = await getActiveConversation(client.id, "instagram");
+        if (!conversation) {
+          conversation = await createConversation(client.id, "instagram");
+        }
+
+        await insertMessage({
+          conversationId: conversation.id,
+          sender: "client",
+          content: text,
+          platformMessageId: mid || null
+        });
+
+        await setAwaitingOwner(conversation.id, config.replyDelayMinutes);
+      }
+
+      // B) Instagram "changes" payloads
+      const changes = Array.isArray(entry.changes) ? entry.changes : [];
+      for (const change of changes) {
+        if (change?.field !== "messages") continue;
+
+        const value = change?.value || {};
+        const senderId = value?.from?.id || value?.sender?.id;
+        const text = value?.text || value?.message?.text;
+        const mid = value?.mid || value?.message?.mid;
+
+        if (!senderId || !text) continue;
+
+        const client = await upsertClient({
+          platform: "instagram",
+          platformUserId: senderId,
+          name: value?.from?.username || null
         });
 
         let conversation = await getActiveConversation(client.id, "instagram");
