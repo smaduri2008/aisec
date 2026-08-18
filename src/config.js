@@ -29,6 +29,7 @@ export const config = {
   geminiModel: process.env.GEMINI_MODEL || "gemini-2.5-flash",
 
   supabaseUrl: required("SUPABASE_URL"),
+  supabaseDbUrl: required("SUPABASE_DB_URL"),
   supabaseServiceKey: required("SUPABASE_SERVICE_KEY"),
   replyDelayMinutes: Number(process.env.REPLY_DELAY_MINUTES || 5)
 };

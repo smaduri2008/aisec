@@ -8,7 +8,7 @@ import { logger } from "../services/logger.js";
 const { Pool } = pg;
 
 // NOTE: Supabase gives a Postgres URI. Keep ssl enabled for hosted DB.
-const connectionString = config.supabaseUrl.replace("postgresql://", "postgres://");
+const connectionString = config.supabaseDbUrl;
 
 export const pool = new Pool({
   connectionString,

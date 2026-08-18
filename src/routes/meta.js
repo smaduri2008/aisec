@@ -152,12 +152,16 @@ router.post("/webhooks/meta/message-deletions", (req, res) => {
  */
 router.post("/webhooks/meta", async (req, res) => {
   const body = req.body;
+
   logWebhook("request_hit", {
     method: req.method,
     path: req.path,
     hasBody: !!body,
     bodyType: typeof body
   });
+
+  // Added: full raw payload for debugging
+  logWebhook("raw_payload", body);
 
   try {
     if (!body?.entry || !Array.isArray(body.entry)) {
@@ -177,6 +181,15 @@ router.post("/webhooks/meta", async (req, res) => {
 
     for (const event of events) {
       try {
+        // Added: per-event diagnostic logging
+        logWebhook("event_inbound", {
+          source: event.source,
+          senderId: event.senderId || null,
+          mid: event.mid || null,
+          hasText: Boolean(event.text),
+          textPreview: typeof event.text === "string" ? event.text.slice(0, 80) : null
+        });
+
         const client = await upsertClient({
           platform: "instagram",
           platformUserId: event.senderId,
@@ -187,6 +200,14 @@ router.post("/webhooks/meta", async (req, res) => {
         if (!conversation) {
           conversation = await createConversation(client.id, "instagram");
         }
+
+        // Added: pre-insert diagnostic
+        logWebhook("inserting_message", {
+          conversationId: conversation?.id || null,
+          sender: "client",
+          hasContent: Boolean(event.text),
+          platformMessageId: event.mid || null
+        });
 
         await insertMessage({
           conversationId: conversation.id,
@@ -205,7 +226,13 @@ router.post("/webhooks/meta", async (req, res) => {
             source: event.source,
             senderId: event.senderId || null,
             mid: event.mid || null,
-            message: eventError.message
+            message: eventError?.message || null,
+            name: eventError?.name || null,
+            code: eventError?.code || null,
+            details: eventError?.details || null,
+            hint: eventError?.hint || null,
+            stack: eventError?.stack || null,
+            raw: eventError || null
           })
         );
       }
@@ -225,7 +252,17 @@ router.post("/webhooks/meta", async (req, res) => {
       errorCount: errors
     });
   } catch (err) {
-    logger.error("Meta webhook processing error:", err.message);
+    logger.error(
+      "[meta-webhook] processing_error",
+      JSON.stringify({
+        message: err?.message || null,
+        name: err?.name || null,
+        code: err?.code || null,
+        details: err?.details || null,
+        hint: err?.hint || null,
+        stack: err?.stack || null
+      })
+    );
     return res.status(200).json({ ok: false, error: "Webhook processing failed" });
   }
 });
