@@ -82,28 +82,41 @@ function extractMetaEvents(body) {
   for (const entry of entries) {
     const messagingEvents = Array.isArray(entry?.messaging) ? entry.messaging : [];
     messagingCount += messagingEvents.length;
+
     for (const event of messagingEvents) {
       const candidate = normalizeMessagingEvent(event);
+
       if (candidate?.senderId && candidate?.text) {
         normalized.push(candidate);
       } else {
-        skipped.push({ source: "entry.messaging", reason: "non_message_or_missing_sender" });
+        skipped.push({
+          source: "entry.messaging",
+          reason: "non_message_or_missing_sender"
+        });
       }
     }
 
     const changes = Array.isArray(entry?.changes) ? entry.changes : [];
     changesCount += changes.length;
+
     for (const change of changes) {
       const candidate = normalizeChangeEvent(change);
+
       if (!candidate) {
-        skipped.push({ source: "entry.changes", reason: "unsupported_field" });
+        skipped.push({
+          source: "entry.changes",
+          reason: "unsupported_field"
+        });
         continue;
       }
 
       if (candidate.senderId && candidate.text) {
         normalized.push(candidate);
       } else {
-        skipped.push({ source: "entry.changes", reason: "non_message_or_missing_sender" });
+        skipped.push({
+          source: "entry.changes",
+          reason: "non_message_or_missing_sender"
+        });
       }
     }
   }
@@ -124,9 +137,6 @@ function logWebhook(event, details) {
   logger.info(`[meta-webhook] ${event}`, JSON.stringify(details));
 }
 
-/**
- * Meta webhook verification
- */
 router.get("/webhooks/meta", (req, res) => {
   const mode = req.query["hub.mode"];
   const token = req.query["hub.verify_token"];
@@ -135,21 +145,15 @@ router.get("/webhooks/meta", (req, res) => {
   if (mode === "subscribe" && token === config.meta.webhookVerifyToken) {
     return res.status(200).send(challenge);
   }
+
   return res.sendStatus(403);
 });
 
-/**
- * Stub for App Review requirement: message deletions handling.
- */
 router.post("/webhooks/meta/message-deletions", (req, res) => {
   logger.info("Received message deletion webhook payload:", JSON.stringify(req.body));
   return res.status(200).json({ ok: true });
 });
 
-/**
- * Instagram webhook receiver
- * Handles inbound messaging events and starts/refreshes reply timer.
- */
 router.post("/webhooks/meta", async (req, res) => {
   const body = req.body;
 
@@ -160,16 +164,23 @@ router.post("/webhooks/meta", async (req, res) => {
     bodyType: typeof body
   });
 
-  // Added: full raw payload for debugging
   logWebhook("raw_payload", body);
 
   try {
     if (!body?.entry || !Array.isArray(body.entry)) {
-      logWebhook("payload_ignored", { reason: "No entry array", object: body?.object || null });
-      return res.status(200).json({ ignored: true, reason: "No entry array" });
+      logWebhook("payload_ignored", {
+        reason: "No entry array",
+        object: body?.object || null
+      });
+
+      return res.status(200).json({
+        ignored: true,
+        reason: "No entry array"
+      });
     }
 
     const { events, skipped, summary } = extractMetaEvents(body);
+
     logWebhook("payload_summary", {
       ...summary,
       normalizedEventCount: events.length,
@@ -181,13 +192,13 @@ router.post("/webhooks/meta", async (req, res) => {
 
     for (const event of events) {
       try {
-        // Added: per-event diagnostic logging
         logWebhook("event_inbound", {
           source: event.source,
           senderId: event.senderId || null,
           mid: event.mid || null,
           hasText: Boolean(event.text),
-          textPreview: typeof event.text === "string" ? event.text.slice(0, 80) : null
+          textPreview:
+            typeof event.text === "string" ? event.text.slice(0, 80) : null
         });
 
         const client = await upsertClient({
@@ -197,11 +208,11 @@ router.post("/webhooks/meta", async (req, res) => {
         });
 
         let conversation = await getActiveConversation(client.id, "instagram");
+
         if (!conversation) {
           conversation = await createConversation(client.id, "instagram");
         }
 
-        // Added: pre-insert diagnostic
         logWebhook("inserting_message", {
           conversationId: conversation?.id || null,
           sender: "client",
@@ -220,6 +231,7 @@ router.post("/webhooks/meta", async (req, res) => {
         processed += 1;
       } catch (eventError) {
         errors += 1;
+
         logger.error(
           "[meta-webhook] event_processing_error",
           JSON.stringify({
@@ -263,14 +275,14 @@ router.post("/webhooks/meta", async (req, res) => {
         stack: err?.stack || null
       })
     );
-    return res.status(200).json({ ok: false, error: "Webhook processing failed" });
+
+    return res.status(200).json({
+      ok: false,
+      error: "Webhook processing failed"
+    });
   }
 });
 
-/**
- * Manual owner send endpoint (used later by dashboard).
- * Sending owner reply also cancels timer and marks owner-handled.
- */
 router.post("/messages/send-owner", async (req, res) => {
   try {
     const { conversationId, recipientPlatformUserId, message } = req.body;
