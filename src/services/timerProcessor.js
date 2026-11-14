@@ -13,6 +13,19 @@ import { getClientById } from "../repositories/clientRepo.js";
 const FALLBACK_REPLY = "Thanks for reaching out — we’ll get back to you shortly.";
 
 export async function processDueTimers() {
+  const settings = await getBusinessSettings();
+
+  if (settings.ai_enabled === false) {
+    const waiting = await dueConversations(50);
+    return {
+      dueCount: waiting.length,
+      processed: 0,
+      skipped: waiting.length,
+      failed: 0,
+      aiDisabled: true
+    };
+  }
+
   const due = await dueConversations(50);
   let processed = 0;
   let skipped = 0;
@@ -33,7 +46,6 @@ export async function processDueTimers() {
       }
 
       const history = await recentMessages(convo.id, 20);
-      const settings = await getBusinessSettings();
 
       let replyText = FALLBACK_REPLY;
       try {

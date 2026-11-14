@@ -28,6 +28,11 @@ export const config = {
   geminiApiKey: process.env.GEMINI_API_KEY || "",
   geminiModel: process.env.GEMINI_MODEL || "gemini-2.5-flash",
 
+  dashboard: {
+    username: process.env.DASHBOARD_USERNAME || "",
+    password: process.env.DASHBOARD_PASSWORD || ""
+  },
+
   supabaseUrl: required("SUPABASE_URL"),
   supabaseDbUrl: required("SUPABASE_DB_URL"),
   supabaseServiceKey: required("SUPABASE_SERVICE_KEY"),

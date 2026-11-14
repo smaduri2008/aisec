@@ -52,3 +52,7 @@ CREATE TABLE IF NOT EXISTS business_settings (
   faq_text TEXT,
   reply_delay_minutes INT NOT NULL DEFAULT 5
 );
+
+-- Added for the owner dashboard's AI on/off toggle. IF NOT EXISTS makes this
+-- safe to re-run against a database that already has the table.
+ALTER TABLE business_settings ADD COLUMN IF NOT EXISTS ai_enabled BOOLEAN NOT NULL DEFAULT true;

@@ -21,3 +21,14 @@ export async function recentMessages(conversationId, limit = 20) {
   );
   return res.rows.reverse();
 }
+
+export async function allMessages(conversationId) {
+  const res = await query(
+    `SELECT id, sender, content, platform_message_id, sent_at
+     FROM messages
+     WHERE conversation_id=$1
+     ORDER BY sent_at ASC`,
+    [conversationId]
+  );
+  return res.rows;
+}

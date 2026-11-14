@@ -84,3 +84,76 @@ export async function lockDueConversation(conversationId) {
   );
   return res.rows[0] || null;
 }
+
+// --- Dashboard-facing reads ---
+
+export async function listConversations({ status, limit = 100 } = {}) {
+  const params = [];
+  let where = "";
+
+  if (status) {
+    params.push(status);
+    where = `WHERE c.status = $${params.length}`;
+  }
+
+  params.push(limit);
+
+  const res = await query(
+    `SELECT
+       c.id,
+       c.platform,
+       c.status,
+       c.reply_due_at,
+       c.last_message_at,
+       cl.id AS client_id,
+       cl.name AS client_name,
+       cl.platform_user_id,
+       cl.phone,
+       cl.email,
+       lm.content AS last_message_content,
+       lm.sender AS last_message_sender,
+       lm.sent_at AS last_message_sent_at
+     FROM conversations c
+     JOIN clients cl ON cl.id = c.client_id
+     LEFT JOIN LATERAL (
+       SELECT content, sender, sent_at
+       FROM messages m
+       WHERE m.conversation_id = c.id
+       ORDER BY m.sent_at DESC
+       LIMIT 1
+     ) lm ON true
+     ${where}
+     ORDER BY c.last_message_at DESC NULLS LAST
+     LIMIT $${params.length}`,
+    params
+  );
+  return res.rows;
+}
+
+export async function getConversationById(conversationId) {
+  const res = await query(
+    `SELECT
+       c.*,
+       cl.name AS client_name,
+       cl.platform_user_id,
+       cl.phone,
+       cl.email
+     FROM conversations c
+     JOIN clients cl ON cl.id = c.client_id
+     WHERE c.id = $1`,
+    [conversationId]
+  );
+  return res.rows[0] || null;
+}
+
+export async function markResolved(conversationId) {
+  const res = await query(
+    `UPDATE conversations
+     SET status='resolved',
+         reply_due_at=NULL
+     WHERE id=$1
+     RETURNING *`,
+    [conversationId]
+  );
+  return res.rows[0] || null;
+}

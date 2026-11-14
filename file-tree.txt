@@ -2,6 +2,10 @@ aisec/
   package.json
   .env.example
   README.md
+  public/
+    index.html
+    styles.css
+    app.js
   src/
     index.js
     config.js
@@ -9,18 +13,21 @@ aisec/
       client.js
       schema.sql
       seed.js
+    middleware/
+      dashboardAuth.js
     routes/
       health.js
       privacy.js
       meta.js
       jobs.js
+      dashboard.js
     services/
       logger.js
       instagram.js
       gemini.js
       timerProcessor.js
     repositories/
-      clientsRepo.js
+      clientRepo.js
       conversationsRepo.js
-      messagesRepo.js
+      messageRepo.js
       settingsRepo.js

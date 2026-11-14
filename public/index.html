@@ -1,0 +1,125 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Front Desk — AI Secretary</title>
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link href="https://fonts.googleapis.com/css2?family=Space+Mono:wght@400;700&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet" />
+<link rel="stylesheet" href="./styles.css" />
+</head>
+<body>
+
+<div class="app">
+
+  <!-- LEFT RAIL: the message-slip stack -->
+  <aside class="rail">
+    <header class="rail-head">
+      <div class="wordmark">FRONT&nbsp;DESK</div>
+      <div class="biz-name" id="bizName">Loading…</div>
+
+      <div class="rail-controls">
+        <button class="ai-toggle" id="aiToggle" type="button" aria-pressed="true">
+          <span class="dot"></span>
+          <span class="ai-toggle-label">AI replies: <strong id="aiToggleState">on</strong></span>
+        </button>
+        <button class="bell-btn" id="checkNowBtn" type="button" title="Ask the server to process any overdue conversations right now">
+          <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2"><path d="M6 8a6 6 0 0 1 12 0c0 5 2 6 2 6H4s2-1 2-6"/><path d="M10 21a2 2 0 0 0 4 0"/></svg>
+          Check now
+        </button>
+      </div>
+
+      <div class="stats" id="stats" aria-label="Conversation counts by status"></div>
+    </header>
+
+    <div class="slip-stack" id="slipStack">
+      <!-- slips injected here -->
+    </div>
+
+    <footer class="rail-foot">
+      <button class="settings-link" id="openSettings" type="button">Front desk settings</button>
+    </footer>
+  </aside>
+
+  <!-- RIGHT PANE: the open conversation -->
+  <main class="thread-pane" id="threadPane">
+    <div class="empty-state" id="emptyState">
+      <div class="empty-mark">✎</div>
+      <p>Pick a slip from the stack to read the full conversation.</p>
+    </div>
+
+    <div class="thread" id="thread" hidden>
+      <header class="thread-head">
+        <button class="back-btn" id="backBtn" type="button" aria-label="Back to list">←</button>
+        <div class="thread-head-main">
+          <div class="thread-name" id="threadName">—</div>
+          <div class="thread-meta" id="threadMeta">—</div>
+        </div>
+        <div class="thread-head-actions">
+          <span class="countdown-chip" id="countdownChip" hidden></span>
+          <button class="ghost-btn" id="resolveBtn" type="button">Mark resolved</button>
+        </div>
+      </header>
+
+      <div class="messages" id="messages"></div>
+
+      <form class="composer" id="composerForm">
+        <textarea id="composerInput" placeholder="Type a reply as the business…" rows="2"></textarea>
+        <button type="submit" id="sendBtn">Send reply</button>
+      </form>
+    </div>
+  </main>
+
+</div>
+
+<!-- SETTINGS MODAL -->
+<div class="modal-backdrop" id="settingsBackdrop" hidden>
+  <div class="modal" role="dialog" aria-modal="true" aria-labelledby="settingsTitle">
+    <h2 id="settingsTitle">Front desk settings</h2>
+    <p class="modal-sub">This is what the AI reads before it writes a reply.</p>
+
+    <form id="settingsForm">
+      <label>
+        <span>Business name</span>
+        <input type="text" name="business_name" id="f_business_name" />
+      </label>
+
+      <label>
+        <span>Hours</span>
+        <input type="text" name="hours" id="f_hours" placeholder="Mon–Fri 9am–5pm" />
+      </label>
+
+      <label>
+        <span>Services</span>
+        <input type="text" name="services" id="f_services" placeholder="What you offer" />
+      </label>
+
+      <label>
+        <span>FAQ / notes for the AI</span>
+        <textarea name="faq_text" id="f_faq_text" rows="4" placeholder="Answers to things customers ask often"></textarea>
+      </label>
+
+      <label>
+        <span>Reply delay (minutes)</span>
+        <input type="number" name="reply_delay_minutes" id="f_reply_delay_minutes" min="1" max="120" />
+      </label>
+
+      <label class="checkbox-row">
+        <input type="checkbox" name="ai_enabled" id="f_ai_enabled" />
+        <span>Let the AI send replies when no one answers in time</span>
+      </label>
+
+      <div class="modal-actions">
+        <button type="button" class="ghost-btn" id="cancelSettings">Cancel</button>
+        <button type="submit" class="primary-btn">Save changes</button>
+      </div>
+    </form>
+  </div>
+</div>
+
+<div class="toast" id="toast" hidden></div>
+
+<script src="./app.js"></script>
+</body>
+</html>
